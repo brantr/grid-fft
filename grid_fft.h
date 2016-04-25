@@ -6,8 +6,8 @@
 #define GRID_FFT_H
 #define PARTICLE_FLOAT
 
-#include<mpi.h>
-#include<fftw3-mpi.h>
+#include <mpi.h>
+#include <fftw3-mpi.h>
 
 /*! \struct FFTW_Grid_Info
  *  \brief  Structure to contain
@@ -76,7 +76,7 @@ struct FFTW_Grid_Info
 	 *  \brief Number of dimensions. */
 	int ndim;
 
-	/*! \var fftw_plan plan
+	/*! \var fftw_plan a
 	 *  \brief Forward plan for FFTs */
 	fftw_plan plan;
 

@@ -12,14 +12,14 @@
  *  must be padded to size nx x ny x 2*(nz/2+1) 
  *
  *  Section 4.8 of the fftw3 manual has what FFTW3 really computes.*/
-#include<mpi.h>
-#include<math.h>
-#include<stdio.h>
-#include<stdlib.h>
-#include<fftw3-mpi.h>
-#include<gsl/gsl_interp.h>
-#include<gsl/gsl_sf_trig.h>
-#include"grid_fft.h"
+#include <mpi.h>
+#include <math.h>
+#include <stdio.h>
+#include <stdlib.h>
+#include <fftw3-mpi.h>
+#include <gsl/gsl_interp.h>
+#include <gsl/gsl_sf_trig.h>
+#include "grid_fft.h"
 
 
 /*! \fn void Copy_FFTW_Grid_Info(FFTW_Grid_Info source, FFTW_Grid_Info *dest)
@@ -77,6 +77,7 @@ int grid_ijk(int i, int j, int k, FFTW_Grid_Info grid_info)
 
 	//see page 61 of fftw3 manual
 	return (i*grid_info.ny + jj)*(2*(grid_info.nz/2+1)) + kk;
+
 }
 
 /*! \fn int grid_index(double x, double y, double z, FFTW_Grid_Info grid_info)
@@ -123,11 +124,22 @@ void initialize_mpi_local_sizes(FFTW_Grid_Info *grid_info, MPI_Comm world)
 	ptrdiff_t nx_local_start;	
 	ptrdiff_t n_local_complex_size;	
 
-	//set the z-index size
-	grid_info->nz_complex = grid_info->nz/2 + 1;
+
 
 	//find the local sizes for complex arrays
-	n_local_complex_size = fftw_mpi_local_size_3d(grid_info->nx, grid_info->ny, grid_info->nz, world, &nx_local, &nx_local_start);
+	switch(grid_info->ndim)
+	{
+		case 2:	n_local_complex_size = fftw_mpi_local_size_2d(grid_info->nx, grid_info->ny, world, &nx_local, &nx_local_start);
+				break;
+		case 3:	n_local_complex_size = fftw_mpi_local_size_3d(grid_info->nx, grid_info->ny, grid_info->nz, world, &nx_local, &nx_local_start);
+
+				//set the z-index size
+				grid_info->nz_complex = grid_info->nz/2 + 1;
+				break;
+		default: printf("Only 2 or 3 dimensions\n");
+				 MPI_Abort(world,-1);
+				 exit(-1);
+	}
 
 	//remember the size
 	grid_info->nx_local       = nx_local;
@@ -466,18 +478,20 @@ void output_fft_grid(char *output_fname, double *data, FFTW_Grid_Info grid_info,
 	
 					if(!error_flag)
 					{
-						for(int i=nx_min;i<nx_max;++i)
-							for(int j=ny_min;j<ny_max;++j)
+						for(int i=nx_min;i<nx_max;i++)
+						{
+							for(int j=ny_min;j<ny_max;j++)
 							{
-								for(int k=nz_min;k<nz_max;++k)
+								for(int k=nz_min;k<nz_max;k++)
 								{
 									ijk_out       = ( (i-nx_min)*ny_out + (j-ny_min) )*nz_out + (k-nz_min);
 									if(grid_info.ndim==2)
 									{
-										ijk           = ( (i-nx_local_start) )*(2*(ny/2+1)) + j;
+										//ijk           = ( (i-nx_local_start) )*(2*(ny/2+1)) + j;
 									}else{
-										ijk           = ( (i-nx_local_start)*ny + j )*(2*(nz/2+1)) + k;
+										//ijk           = ( (i-nx_local_start)*ny + j )*(2*(nz/2+1)) + k;
 									}
+									ijk = grid_ijk(i,j,k,grid_info);
 
 									if(ijk_out>=(nx_out*ny_out*nz_out))
 									{
@@ -493,6 +507,7 @@ void output_fft_grid(char *output_fname, double *data, FFTW_Grid_Info grid_info,
 									xout[ijk_out] = data[ijk]; 
 								}
 							}
+						}
 
 						//write the data
 
@@ -541,7 +556,6 @@ void output_fft_grid(char *output_fname, double *data, FFTW_Grid_Info grid_info,
 
 				if(!error_flag)
 				{
-
 					//write this process's data to file
 
 					nx_out = nx_max - nx_min;
@@ -563,12 +577,13 @@ void output_fft_grid(char *output_fname, double *data, FFTW_Grid_Info grid_info,
 								for(int k=nz_min;k<nz_max;++k)
 								{
 									ijk_out       = ( (i-nx_min)*ny_out + (j-ny_min) )*nz_out + (k-nz_min);
-									if(grid_info.ndim==2)
+									/*if(grid_info.ndim==2)
 									{
 										ijk           = ( (i-nx_local_start) )*(2*(ny/2+1)) + j;
 									}else{
 										ijk           = ( (i-nx_local_start)*ny + j )*(2*(nz/2+1)) + k;
-									}
+									}*/
+									ijk = grid_ijk(i,j,k,grid_info);
 
 									if(ijk_out>=(nx_out*ny_out*nz_out))
 									{
