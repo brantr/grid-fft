@@ -40,6 +40,12 @@ struct FFTW_Grid_Info
 	 *  \brief First grid point in x-direction */
 	ptrdiff_t nx_local_start;
 
+	ptrdiff_t nx_local_transposed;
+	ptrdiff_t nx_local_start_transposed;
+	ptrdiff_t ny_local_transposed;
+	ptrdiff_t ny_local_start_transposed;
+
+
 	/*! \var int *n_local_real_size
 	 *  \brief Total size of real grids on local process.*/
 	ptrdiff_t n_local_real_size;
@@ -97,6 +103,10 @@ int grid_ijk(int i, int j, int k, FFTW_Grid_Info grid_info);
 /*! \fn int grid_index(double x, double y, double z, FFTW_Grid_Info grid_info)
  *  \brief Given a position, return the grid index. */
 int grid_index(double x, double y, double z, FFTW_Grid_Info grid_info);
+
+/*! \fn int grid_transposed_ijk(int i, int j, int k, FFTW_Grid_Info grid_info)
+ *  \brief Array index for complex fftw grid based on coordinates i,j,k. */
+int grid_transposed_ijk(int i, int j, int k, FFTW_Grid_Info grid_info);
 
 /*! \fn int grid_complex_ijk(int i, int j, int k, FFTW_Grid_Info grid_info)
  *  \brief Array index for complex fftw grid based on coordinates i,j,k. */

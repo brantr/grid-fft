@@ -61,7 +61,75 @@ int grid_ijk(int i, int j, int k, FFTW_Grid_Info grid_info)
 {
 	int jj;	//wrap safe y index
 	int kk;	//wrap safe z index
+	int ijk;
 
+	//wrap safely in y and z
+	jj = j;
+	if(jj<0)
+		jj += grid_info.ny;
+	if(jj>(grid_info.ny-1))
+		jj -= grid_info.ny;
+
+	kk = k;
+	if(kk<0)
+		kk += grid_info.nz;
+	if(kk>(grid_info.nz-1))
+		kk -= grid_info.nz;
+
+	switch(grid_info.ndim)
+	{
+		case 2: ijk = i*(2*(grid_info.ny/2+1)) + jj;
+				break;
+		case 3: ijk = (i*grid_info.ny + jj)*(2*(grid_info.nz/2+1)) + kk;
+	}
+
+	//see page 61 of fftw3 manual
+	//checked 04/27/2016
+	return ijk;
+
+}
+
+/*! \fn int grid_complex_ijk(int i, int j, int k, FFTW_Grid_Info grid_info)
+ *  \brief Array index for complex fftw grid based on coordinates i,j,k. */
+int grid_complex_ijk(int i, int j, int k, FFTW_Grid_Info grid_info)
+{
+	//complex data is stored as n_0 x n_1 x (n_d-1/2+1)
+	int ijk;
+	int jj = j;
+	int kk = k;
+	int nx = grid_info.nx;
+	int ny = grid_info.ny;
+	int nz = grid_info.nz;
+	switch(grid_info.ndim)
+	{
+		case 2: if(j>ny/2)
+					j -= ny/2;
+				ijk = i*(grid_info.ny/2 +1) + jj;;
+				break;
+		case 3:	if(k>nz/2)
+					k -= nz/2;
+				ijk =  (i*grid_info.ny + jj)*(grid_info.nz/2 +1) + kk;
+
+	}
+	return ijk;
+}
+
+/*! \fn int grid_transposed_ijk(int i, int j, int k, FFTW_Grid_Info grid_info)
+ *  \brief Array index for fftw grid based on coordinates i,j,k. */
+int grid_transposed_ijk(int i, int j, int k, FFTW_Grid_Info grid_info)
+{
+	//#error fix this
+	int jj;	//wrap safe y index
+	int kk;	//wrap safe z index
+
+	if(grid_info.ndim==2)
+	{
+
+	}else{
+		
+	}
+
+	/*
 	//wrap safely in y and z
 	jj = j;
 	if(jj<0)
@@ -77,8 +145,11 @@ int grid_ijk(int i, int j, int k, FFTW_Grid_Info grid_info)
 
 	//see page 61 of fftw3 manual
 	return (i*grid_info.ny + jj)*(2*(grid_info.nz/2+1)) + kk;
+	*/
 
+	return 0;
 }
+
 
 /*! \fn int grid_index(double x, double y, double z, FFTW_Grid_Info grid_info)
  *  \brief Given a position, return the grid index. */
@@ -97,14 +168,7 @@ int grid_index(double x, double y, double z, FFTW_Grid_Info grid_info)
 	return grid_ijk(i,j,k,grid_info);	
 }
 
-/*! \fn int grid_complex_ijk(int i, int j, int k, FFTW_Grid_Info grid_info)
- *  \brief Array index for complex fftw grid based on coordinates i,j,k. */
-int grid_complex_ijk(int i, int j, int k, FFTW_Grid_Info grid_info)
-{
-	//no wrapping
-	//complex are nx x ny x nz
-	return (i*grid_info.ny + j)*grid_info.nz + k;
-}
+
 
 
 /*! \fn int grid_complex_from_real_ijk(int i, int j, int k, FFTW_Grid_Info grid_info)
@@ -122,19 +186,22 @@ void initialize_mpi_local_sizes(FFTW_Grid_Info *grid_info, MPI_Comm world)
 {
 	ptrdiff_t nx_local;	
 	ptrdiff_t nx_local_start;	
-	ptrdiff_t n_local_complex_size;	
+	//ptrdiff_t ny_local;	
+	//ptrdiff_t ny_local_start;
+	//ptrdiff_t nx_local_transposed;	
+	//ptrdiff_t nx_local_start_transposed;	
+	//ptrdiff_t ny_local_transposed;	
+	//ptrdiff_t ny_local_start_transposed;
+	//ptrdiff_t n_local_complex_size;	
+	ptrdiff_t n_local_size;
 
 
-
-	//find the local sizes for complex arrays
+	//find the local sizes for *****complex arrays******
 	switch(grid_info->ndim)
 	{
-		case 2:	n_local_complex_size = fftw_mpi_local_size_2d(grid_info->nx, grid_info->ny, world, &nx_local, &nx_local_start);
+		case 2:	n_local_size         = fftw_mpi_local_size_2d(grid_info->nx, grid_info->ny/2+1, world, &nx_local, &nx_local_start);
 				break;
-		case 3:	n_local_complex_size = fftw_mpi_local_size_3d(grid_info->nx, grid_info->ny, grid_info->nz, world, &nx_local, &nx_local_start);
-
-				//set the z-index size
-				grid_info->nz_complex = grid_info->nz/2 + 1;
+		case 3:	n_local_size         = fftw_mpi_local_size_3d(grid_info->nx, grid_info->ny, grid_info->nz/2+1, world, &nx_local, &nx_local_start);
 				break;
 		default: printf("Only 2 or 3 dimensions\n");
 				 MPI_Abort(world,-1);
@@ -142,17 +209,21 @@ void initialize_mpi_local_sizes(FFTW_Grid_Info *grid_info, MPI_Comm world)
 	}
 
 	//remember the size
-	grid_info->nx_local       = nx_local;
-	grid_info->nx_local_start = nx_local_start;
-	grid_info->n_local_complex_size = n_local_complex_size;
-	grid_info->n_local_real_size    = 2*n_local_complex_size;
+	grid_info->nx_local                  = nx_local;
+	grid_info->nx_local_start            = nx_local_start;
+	grid_info->n_local_complex_size      = n_local_size;
+	//grid_info->nx_local_transposed       = nx_local_transposed;
+	//grid_info->nx_local_start_transposed = nx_local_start_transposed;
+	//grid_info->ny_local_transposed       = ny_local_transposed;
+	//grid_info->ny_local_start_transposed = ny_local_start_transposed;
+	grid_info->n_local_real_size         = 2*grid_info->n_local_complex_size;
 
-
-	if(!(nx_local>0))
+	printf("nx_local %ld (nx_local) %ld\n",nx_local,(nx_local));
+	if(nx_local<=0)
 	{
-	    printf("*****************************************\n");
+	    printf("A*****************************************\n");
 	    printf("WARNING!\n");
-	    printf("nx_local = %d on at least 1 processor\n",(int) nx_local);
+	    printf("nx_local = %ld on at least 1 processor\n",(ptrdiff_t) nx_local);
 	    printf("Many functions implicitly assume nx_local>0\n");
 	    printf("Try a different (lower) nprocs if possible.\n");
 	    printf("*****************************************\n");
@@ -295,9 +366,9 @@ void forward_transform_fftw_grid(double *work, fftw_complex *cwork, FFTW_Grid_In
 	fftw_execute(grid_info.plan);
 
 	//normalize transform
-	for(int i=0;i<grid_info.nx_local;++i)
-		for(int j=0;j<grid_info.ny;++j)
-			for(int k=0;k<grid_info.nz_complex;++k)
+	for(int i=0;i<grid_info.nx_local_transposed;++i)
+		for(int j=0;j<grid_info.ny_local_transposed;++j)
+			for(int k=0;k<grid_info.nz;++k)
 			{
 				//find i,j,k element
 				ijk = grid_complex_ijk(i,j,k,grid_info);
